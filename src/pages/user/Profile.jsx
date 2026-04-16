@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { authService } from '../../utils/auth'; // ✅ Import authService
+import { authService } from '../../utils/auth';
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -7,21 +7,31 @@ const Profile = () => {
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  // ✅ Get user dari localStorage
+  // Ambil user data
   const currentUser = authService.getUser();
 
-  useEffect(() => { 
-    fetchUser(); 
+  useEffect(() => {
+    // Pastikan fetchUser dipanggil hanya jika currentUser ada
+    if (currentUser) {
+      fetchUser();
+    } else {
+      console.error('No current user found in storage');
+      setLoading(false);
+    }
   }, []);
 
   const fetchUser = async () => {
     setLoading(true);
     try {
-      // ✅ Gunakan userId dari user yang login
-      const userId = currentUser?.userId;
+      // Ambil ulang dari storage untuk memastikan data terbaru
+      const storedUser = authService.getUser(); 
+      console.log("Data dari storage:", storedUser);
+
+      // Gunakan nama properti yang sesuai dengan screenshot (userId)
+      const userId = storedUser?.userId; 
       
       if (!userId) {
-        console.error('User ID tidak ditemukan');
+        console.error('User ID masih tidak ditemukan. Isi storedUser:', storedUser);
         setLoading(false);
         return;
       }
@@ -29,21 +39,22 @@ const Profile = () => {
       const res = await fetch(`http://localhost:5014/api/Users/${userId}`);
       
       if (!res.ok) {
-        throw new Error('Failed to fetch user data');
+        throw new Error(`Server responded with ${res.status}`);
       }
       
       const data = await res.json();
-      console.log('User data:', data); // Debug
       
       setUser(data);
+      // Sinkronkan form dengan data dari backend
       setForm({ 
-        fullName: data.FullName || data.fullName, 
-        phone: data.Phone || data.phone, 
-        address: data.Address || data.address || '' 
+        fullName: data.fullName || data.FullName || '', 
+        phone: data.phone || data.Phone || '', 
+        address: data.address || data.Address || '' 
       });
     } catch (err) {
       console.error('Error fetching user:', err);
-      alert('Gagal memuat data profil');
+      // Jangan alert jika gagal fetch awal agar tidak mengganggu UX, 
+      // cukup tampilkan state error di UI jika perlu
     } finally {
       setLoading(false);
     }
@@ -55,16 +66,16 @@ const Profile = () => {
     e.preventDefault();
     
     try {
-      const userId = user.UserId || user.userId;
+      const userId = user?.userId || user?.UserId;
       
-      // ✅ Prepare data sesuai format backend
       const updateData = {
-        username: user.Username || user.username,
-        email: user.Email || user.email,
+        // Tetap sertakan data lama yang tidak diubah agar tidak NULL di DB
+        username: user.username || user.Username,
+        email: user.email || user.Email,
         fullName: form.fullName,
         phone: form.phone,
         address: form.address,
-        role: user.Role ?? user.role
+        role: user.role ?? user.Role
       };
 
       const res = await fetch(`http://localhost:5014/api/Users/${userId}`, {
@@ -73,48 +84,56 @@ const Profile = () => {
         body: JSON.stringify(updateData),
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to update profile');
-      }
+      if (!res.ok) throw new Error('Failed to update profile');
 
-      // ✅ Update localStorage dengan data baru
-      const updatedUser = {
+      // ✅ Update data di localStorage agar navbar/komponen lain ikut update
+      const updatedLocalStorageUser = {
         ...currentUser,
         fullName: form.fullName
       };
-      authService.login(updatedUser);
+      // Gunakan method yang sesuai di authService Anda untuk update storage
+      localStorage.setItem('user', JSON.stringify(updatedLocalStorageUser));
 
       alert('Profil berhasil diupdate!');
       setEditing(false);
-      fetchUser();
+      fetchUser(); // Refresh data
     } catch (err) {
       console.error('Error updating profile:', err);
       alert('Gagal mengupdate profil');
     }
   };
 
-  if (loading || !user) {
+  // State loading yang lebih informatif
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="animate-pulse text-gray-500 font-medium">Loading Profile...</div>
+        <div className="flex flex-col items-center">
+           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
+           <div className="text-gray-500 font-medium">Memuat Profil...</div>
+        </div>
       </div>
     );
   }
 
-  // ✅ Handle both PascalCase and camelCase
-  const userFullName = user.FullName || user.fullName || 'User';
-  const userEmail = user.Email || user.email || '';
-  const userPhone = user.Phone || user.phone || '';
-  const userAddress = user.Address || user.address || '';
-  const userRole = user.Role ?? user.role;
-  
-  // Map role number to text
+  // Jika Loading selesai tapi user tetap tidak ada
+  if (!user && !loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-red-500">Sesi berakhir atau data tidak ditemukan. Silakan login kembali.</div>
+      </div>
+    );
+  }
+
+  // Helper untuk akses properti yang case-insensitive
+  const userFullName = user?.fullName || user?.FullName || 'User';
+  const userEmail = user?.email || user?.Email || '';
+  const userPhone = user?.phone || user?.Phone || '';
+  const userAddress = user?.address || user?.Address || '';
+  const userRole = user?.role ?? user?.Role;
+
   const getRoleText = (role) => {
-    const roles = {
-      0: 'Customer',
-      1: 'Admin'
-    };
-    return typeof role === 'number' ? roles[role] : role;
+    const roles = { 0: 'Customer', 1: 'Admin' };
+    return roles[role] || 'User';
   };
 
   return (
@@ -122,7 +141,6 @@ const Profile = () => {
       <h2 className="text-3xl font-extrabold text-gray-800 mb-8 pb-4 border-b">Profil Saya</h2>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Avatar & Basic Info */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
             <div className="relative inline-block mb-4">
@@ -131,7 +149,6 @@ const Profile = () => {
               </div>
               <div className="absolute bottom-0 right-0 w-6 h-6 bg-green-500 border-4 border-white rounded-full"></div>
             </div>
-            
             <h3 className="text-xl font-bold text-gray-800">{userFullName}</h3>
             <p className="text-gray-500 text-sm mb-4">{userEmail}</p>
             <span className="inline-block px-4 py-1 bg-blue-50 text-blue-600 text-xs font-bold uppercase tracking-wider rounded-full">
@@ -140,7 +157,6 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Right Column: Detailed Info / Form */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
@@ -191,7 +207,6 @@ const Profile = () => {
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                     />
                   </div>
-                  
                   <div className="flex flex-col space-y-1.5">
                     <label className="text-sm font-bold text-gray-600">Nomor Telepon</label>
                     <input 
@@ -203,7 +218,6 @@ const Profile = () => {
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                     />
                   </div>
-
                   <div className="flex flex-col space-y-1.5">
                     <label className="text-sm font-bold text-gray-600">Alamat</label>
                     <textarea 
@@ -214,19 +228,11 @@ const Profile = () => {
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                     ></textarea>
                   </div>
-
                   <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-50">
                     <button 
                       type="button" 
                       className="px-6 py-2 text-gray-500 font-semibold hover:bg-gray-100 rounded-xl transition"
-                      onClick={() => {
-                        setEditing(false);
-                        setForm({ 
-                          fullName: userFullName, 
-                          phone: userPhone, 
-                          address: userAddress 
-                        });
-                      }}
+                      onClick={() => setEditing(false)}
                     >
                       Batal
                     </button>

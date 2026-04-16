@@ -83,7 +83,7 @@ const Booking = () => {
 
   const handleBook = async (fieldId) => {
     console.log("🎫 Booking field:", fieldId);
-    const authData = authService.getAuthData(); // ✅ Gunakan helper untuk ambil token & user
+    const authData = JSON.parse(localStorage.getItem('auth_data')); // ✅ Gunakan helper untuk ambil token & user
     const token = authData?.token;
     // ✅ Validasi user login
     if (!user) {
