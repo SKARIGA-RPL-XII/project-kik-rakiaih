@@ -131,3 +131,4 @@ C:\MyFullstackProject\backend-manajemen-lapangan\bin\Debug\net9.0\Microsoft.Iden
 C:\MyFullstackProject\backend-manajemen-lapangan\bin\Debug\net9.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
 C:\MyFullstackProject\backend-manajemen-lapangan\bin\Debug\net9.0\Microsoft.IdentityModel.Tokens.dll
 C:\MyFullstackProject\backend-manajemen-lapangan\bin\Debug\net9.0\System.IdentityModel.Tokens.Jwt.dll
+C:\MyFullstackProject\backend-manajemen-lapangan\obj\Debug\net9.0\backend-manajemen-lapangan.sourcelink.json

@@ -59,25 +59,39 @@ namespace FieldReservationSystem.Controllers
         }
 
         // PUT: api/Payments/5/confirm
-        [HttpPut("{id}/confirm")]
-        public async Task<IActionResult> ConfirmPayment(int id, int confirmedBy)
-        {
-            var payment = await _context.Payments.Include(p => p.Booking).FirstOrDefaultAsync(p => p.PaymentId == id);
-            if (payment == null)
-                return NotFound();
+       [HttpPut("{id}/confirm")]
+public async Task<IActionResult> ConfirmPayment(int id, [FromBody] ConfirmPaymentDto dto)
+{
+    // 1. Cari payment beserta data booking-nya
+    var payment = await _context.Payments
+        .Include(p => p.Booking)
+        .FirstOrDefaultAsync(p => p.PaymentId == id);
 
-            payment.Status = PaymentStatus.Confirmed;
-            payment.ConfirmedAt = DateTime.Now;
-            payment.ConfirmedBy = confirmedBy;
+    if (payment == null) return NotFound(new { message = "Payment data not found" });
 
-            // Update booking status
-            payment.Booking.Status = BookingStatus.Approved;
-            payment.Booking.UpdatedAt = DateTime.Now;
+    // 2. Update status Payment
+    payment.Status = PaymentStatus.Confirmed;
+    payment.ConfirmedAt = DateTime.UtcNow; // Gunakan UtcNow agar konsisten
+    payment.ConfirmedBy = dto.ConfirmedBy;
 
-            await _context.SaveChangesAsync();
+    // 3. Update status Booking menjadi Completed (atau Approved)
+    // Biasanya jika sudah bayar, status booking otomatis selesai/sah
+    if (payment.Booking != null)
+    {
+        payment.Booking.Status = BookingStatus.Completed; // Ubah ke Completed karena sudah lunas
+        payment.Booking.UpdatedAt = DateTime.UtcNow;
+    }
 
-            return NoContent();
-        }
+    try
+    {
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Pembayaran dikonfirmasi dan status booking diperbarui." });
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new { message = "Gagal memperbarui data", error = ex.Message });
+    }
+}
 
         // DELETE: api/Payments/5
         [HttpDelete("{id}")]
@@ -101,4 +115,9 @@ namespace FieldReservationSystem.Controllers
         public string PaymentProofUrl { get; set; }
         public string Notes { get; set; }
     }
+
+    public class ConfirmPaymentDto
+{
+    public int ConfirmedBy { get; set; }
+}
 }
