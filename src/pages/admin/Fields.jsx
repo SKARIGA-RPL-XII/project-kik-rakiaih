@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const Fields = () => {
   const [fields, setFields] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ fieldTypeId: 1, fieldName: '', description: '', pricePerHour: '', status: 0, imageUrl: '' });
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => { fetchFields(); }, []);
 
@@ -15,48 +17,64 @@ const Fields = () => {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  // Payload bersih: Hanya kirim data yang memang diinput oleh user
-  const payload = {
-    fieldTypeId: parseInt(form.fieldTypeId),
-    fieldName: form.fieldName,
-    description: form.description || "",
-    pricePerHour: parseFloat(form.pricePerHour),
-    status: parseInt(form.status),
-    imageUrl: form.imageUrl || ""
+  // ✅ Handler untuk upload gambar
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result);       // untuk preview di UI
+      setForm({ ...form, imageUrl: reader.result }); // base64 dikirim ke API
+    };
+    reader.readAsDataURL(file);
   };
 
-  // Jika Edit, kirim fieldId di dalam body (biasanya diminta oleh .NET PUT)
-  if (editId) {
-    payload.fieldId = editId;
-  }
+  // ✅ Hapus gambar yang dipilih
+  const handleRemoveImage = () => {
+    setImagePreview(null);
+    setForm({ ...form, imageUrl: '' });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
-  const method = editId ? 'PUT' : 'POST';
-  const url = editId ? `http://localhost:5014/api/Fields/${editId}` : 'http://localhost:5014/api/Fields';
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  try {
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    const payload = {
+      fieldTypeId: parseInt(form.fieldTypeId),
+      fieldName: form.fieldName,
+      description: form.description || "",
+      pricePerHour: parseFloat(form.pricePerHour),
+      status: parseInt(form.status),
+      imageUrl: form.imageUrl || ""
+    };
 
-    if (res.ok) {
-      alert(editId ? "Lapangan berhasil diperbarui!" : "Lapangan berhasil ditambahkan!");
-      fetchFields();
-      closeModal();
-    } else {
-      const errorData = await res.json();
-      console.error("Detail Error:", errorData);
-      alert("Gagal menyimpan: " + (errorData.title || "Terjadi kesalahan validasi"));
+    if (editId) payload.fieldId = editId;
+
+    const method = editId ? 'PUT' : 'POST';
+    const url = editId ? `http://localhost:5014/api/Fields/${editId}` : 'http://localhost:5014/api/Fields';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        alert(editId ? "Lapangan berhasil diperbarui!" : "Lapangan berhasil ditambahkan!");
+        fetchFields();
+        closeModal();
+      } else {
+        const errorData = await res.json();
+        console.error("Detail Error:", errorData);
+        alert("Gagal menyimpan: " + (errorData.title || "Terjadi kesalahan validasi"));
+      }
+    } catch (error) {
+      console.error("Network Error:", error);
+      alert("Koneksi ke server gagal.");
     }
-  } catch (error) {
-    console.error("Network Error:", error);
-    alert("Koneksi ke server gagal.");
-  }
-};
+  };
 
   const handleDelete = async (id) => {
     if (window.confirm('Hapus lapangan ini?')) {
@@ -66,25 +84,31 @@ const Fields = () => {
   };
 
   const openModal = (field = null) => {
-  if (field) {
-    setEditId(field.fieldId);
-    setForm({ 
-      // Ambil ID-nya saja, pastikan default ke 1 jika null
-      fieldTypeId: field.fieldTypeId || field.fieldType?.fieldTypeId || 1, 
-      fieldName: field.fieldName, 
-      description: field.description || '', 
-      pricePerHour: field.pricePerHour, 
-      status: field.status, 
-      imageUrl: field.imageUrl || '' 
-    });
-  } else {
-    setEditId(null);
-    setForm({ fieldTypeId: 1, fieldName: '', description: '', pricePerHour: '', status: 0, imageUrl: '' });
-  }
-  setShowModal(true);
-};
+    if (field) {
+      setEditId(field.fieldId);
+      setForm({
+        fieldTypeId: field.fieldTypeId || field.fieldType?.fieldTypeId || 1,
+        fieldName: field.fieldName,
+        description: field.description || '',
+        pricePerHour: field.pricePerHour,
+        status: field.status,
+        imageUrl: field.imageUrl || ''
+      });
+      // ✅ Tampilkan preview gambar lama saat edit
+      setImagePreview(field.imageUrl || null);
+    } else {
+      setEditId(null);
+      setForm({ fieldTypeId: 1, fieldName: '', description: '', pricePerHour: '', status: 0, imageUrl: '' });
+      setImagePreview(null);
+    }
+    setShowModal(true);
+  };
 
-  const closeModal = () => setShowModal(false);
+  const closeModal = () => {
+    setShowModal(false);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -172,7 +196,7 @@ const Fields = () => {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Harga / Jam (Rp)</label>
-                  <input type="number" name="pricePerHour" value={form.pricePerHour} onChange={handleChange} placeholder="50140" required className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all" />
+                  <input type="number" name="pricePerHour" value={form.pricePerHour} onChange={handleChange} placeholder="50000" required className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
@@ -183,10 +207,47 @@ const Fields = () => {
                   </select>
                 </div>
               </div>
+
+              {/* ✅ BAGIAN UPLOAD GAMBAR — menggantikan input URL */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Image URL</label>
-                <input type="text" name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="URL gambar" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all" />
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Foto Lapangan</label>
+
+                {/* Area drop / klik upload */}
+                {!imagePreview ? (
+                  <div
+                    onClick={() => fileInputRef.current.click()}
+                    className="w-full h-36 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-pink-400 hover:bg-pink-50 transition-all"
+                  >
+                    <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-sm text-gray-500">Klik untuk pilih gambar</p>
+                    <p className="text-xs text-gray-400 mt-1">PNG, JPG, WEBP (maks. 2MB)</p>
+                  </div>
+                ) : (
+                  /* Preview gambar yang sudah dipilih */
+                  <div className="relative w-full h-36 rounded-lg overflow-hidden border border-gray-200">
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {/* Input file tersembunyi */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
               </div>
+
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                 <button type="button" onClick={closeModal} className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors">Batal</button>
                 <button type="submit" className="px-5 py-2.5 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity">Simpan</button>
