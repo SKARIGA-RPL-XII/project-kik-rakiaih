@@ -18,17 +18,45 @@ const Fields = () => {
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   // ✅ Handler untuk upload gambar
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  // Ganti fungsi handleImageChange kamu dengan ini
+const handleImageChange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result);       // untuk preview di UI
-      setForm({ ...form, imageUrl: reader.result }); // base64 dikirim ke API
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    const img = new Image();
+    img.src = reader.result;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      
+      // 1. Tentukan batas maksimal resolusi (misal 800px)
+      const MAX_WIDTH = 800;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > MAX_WIDTH) {
+        height *= MAX_WIDTH / width;
+        width = MAX_WIDTH;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // 2. Kompres kualitas ke 0.6 (60%) dan ubah ke JPEG agar jauh lebih ringan
+      const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+
+      setImagePreview(compressedBase64);
+      setForm({ ...form, imageUrl: compressedBase64 });
+      
+      console.log("📏 Ukuran setelah kompres:", (compressedBase64.length / 1024).toFixed(2), "KB");
     };
-    reader.readAsDataURL(file);
   };
+  reader.readAsDataURL(file);
+};
 
   // ✅ Hapus gambar yang dipilih
   const handleRemoveImage = () => {
