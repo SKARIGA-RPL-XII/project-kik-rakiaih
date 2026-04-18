@@ -84,39 +84,28 @@ namespace FieldReservationSystem.Controllers
         }
 
         // GET: api/Fields/available?date=2024-01-01&startTime=10:00&endTime=12:00
-        [HttpGet("available")]
-        public async Task<ActionResult<IEnumerable<Field>>> GetAvailableFields(
+ [HttpGet("available")]
+public async Task<ActionResult<IEnumerable<Field>>> GetAvailableFields(
     [FromQuery] DateTime date, 
     [FromQuery] TimeSpan startTime, 
     [FromQuery] TimeSpan endTime)
 {
     try
     {
-        // ✅ Validasi input
         if (endTime <= startTime)
-        {
             return BadRequest(new { message = "End time must be greater than start time" });
-        }
 
-        // ✅ Validasi tanggal tidak boleh di masa lalu
-        if (date.Date < DateTime.Today)
-        {
-            return BadRequest(new { message = "Cannot book for past dates" });
-        }
+        // ✅ PERBAIKAN 1: Pastikan tanggal dalam format Date murni tanpa peduli Timezone
+        // Kita bandingkan Year, Month, dan Day secara eksplisit agar lebih akurat
+        var checkDate = date.Date;
 
-        // ✅ Normalize date to UTC midnight
-        var utcDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
-
-        Console.WriteLine($"🔍 Checking availability for date: {utcDate:yyyy-MM-dd}, time: {startTime}-{endTime}");
-
-        // ✅ Get field IDs that are booked and conflict with requested time
+        // 1. Cari ID Lapangan yang sedang "terpakai"
         var bookedFieldIds = await _context.Bookings
             .Where(b => 
-                b.BookingDate.Date == utcDate.Date &&
-                (b.Status == BookingStatus.Pending || 
-                 b.Status == BookingStatus.Approved || 
-                 b.Status == BookingStatus.Completed) &&
-                // Time overlap check
+                // ✅ PERBAIKAN 2: Gunakan perbandingan Date yang lebih aman
+                b.BookingDate.Date == checkDate &&
+                (b.Status == BookingStatus.Approved || b.Status == BookingStatus.Pending) &&
+                // ✅ PERBAIKAN 3: Pastikan tipe data TimeSpan dibandingkan dengan benar
                 b.StartTime < endTime && 
                 b.EndTime > startTime
             )
@@ -124,9 +113,11 @@ namespace FieldReservationSystem.Controllers
             .Distinct()
             .ToListAsync();
 
-        Console.WriteLine($"📋 Booked field IDs: {string.Join(", ", bookedFieldIds)}");
+        // Debugging (Cek di terminal dotnet apakah ID lapangan masuk ke sini)
+        Console.WriteLine($"Check Date: {checkDate:yyyy-MM-dd}");
+        Console.WriteLine($"Booked IDs found: {string.Join(",", bookedFieldIds)}");
 
-        // ✅ Get available fields (not booked at requested time)
+        // 2. Ambil lapangan yang tersedia
         var availableFields = await _context.Fields
             .Include(f => f.FieldType)
             .Where(f => 
@@ -136,14 +127,13 @@ namespace FieldReservationSystem.Controllers
             .OrderBy(f => f.FieldName)
             .ToListAsync();
 
-        Console.WriteLine($"✅ Available fields count: {availableFields.Count}");
-
         return Ok(availableFields);
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Error in GetAvailableFields: {ex.Message}");
-        return StatusCode(500, new { message = "An error occurred while fetching available fields" });
+        // Debug error detail di console backend
+        Console.WriteLine($"Error in GetAvailableFields: {ex.Message}");
+        return StatusCode(500, new { message = "Server Error", detail = ex.Message });
     }
 }
 

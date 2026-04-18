@@ -78,7 +78,7 @@ public async Task<IActionResult> ConfirmPayment(int id, [FromBody] ConfirmPaymen
     // Biasanya jika sudah bayar, status booking otomatis selesai/sah
     if (payment.Booking != null)
     {
-        payment.Booking.Status = BookingStatus.Completed; // Ubah ke Completed karena sudah lunas
+        payment.Booking.Status = BookingStatus.Approved; // Ubah ke Completed karena sudah lunas
         payment.Booking.UpdatedAt = DateTime.UtcNow;
     }
 

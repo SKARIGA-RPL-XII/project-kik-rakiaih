@@ -33,6 +33,17 @@ builder.Services.AddCors(options =>
             .AllowCredentials());
 });
 
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartBodyLengthLimit = int.MaxValue;
+    options.MemoryBufferThreshold = int.MaxValue;
+});
+
+builder.Services.AddControllers().AddJsonOptions(options => {
+    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+});
+
 // Add Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

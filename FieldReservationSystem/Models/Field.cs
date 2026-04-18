@@ -35,8 +35,8 @@ namespace FieldReservationSystem.Models
         [Required]
         public FieldStatus Status { get; set; } = FieldStatus.Available;
 
-        [MaxLength(255)]
-        public string ImageUrl { get; set; }
+        [Column(TypeName = "text")]
+        public string? ImageUrl { get; set; }
 
         // Ubah dari DateTime.Now menjadi DateTime.UtcNow
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

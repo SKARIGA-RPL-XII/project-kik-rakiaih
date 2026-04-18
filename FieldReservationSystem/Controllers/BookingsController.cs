@@ -184,7 +184,7 @@ if (hasConflict)
                 return NotFound();
 
             booking.Status = dto.Status;
-            booking.UpdatedAt = DateTime.Now;
+            booking.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 

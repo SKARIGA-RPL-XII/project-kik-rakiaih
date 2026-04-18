@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("backend-manajemen-lapangan")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+35c4e7ed185b48981ce5c894fca6df89fce5089a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c02615aa819195c22316fd7b6f9df76fc757095e")]
 [assembly: System.Reflection.AssemblyProductAttribute("backend-manajemen-lapangan")]
 [assembly: System.Reflection.AssemblyTitleAttribute("backend-manajemen-lapangan")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
