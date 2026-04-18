@@ -6,18 +6,16 @@ const USER_KEY = 'user_data';
 
 export const authService = {
   login: (userData) => {
-    // userData berisi: { userId, role, username, email, fullName, token }
+    // userData biasanya: { userId, role, username, email, fullName, token }
     localStorage.setItem(USER_KEY, JSON.stringify(userData));
     
     const expiry = new Date().getTime() + (24 * 60 * 60 * 1000); 
     localStorage.setItem('auth_expiry', expiry.toString());
   },
 
-  // Satukan logika pengecekan expiry dan pengambilan data di sini
   getAuthData: () => {
     const expiry = localStorage.getItem('auth_expiry');
     
-    // Cek apakah token sudah kadaluwarsa
     if (expiry && new Date().getTime() > parseInt(expiry)) {
       authService.logout();
       return null;
@@ -27,9 +25,9 @@ export const authService = {
     return data ? JSON.parse(data) : null; 
   },
 
-  // Ambil data user secara utuh
   getUser: () => {
-    // Panggil getAuthData() agar otomatis mengecek expiry
+    // Karena user_data kamu berisi objek user + token secara flat,
+    // kita kembalikan semua datanya di sini.
     return authService.getAuthData();
   },
 
@@ -40,8 +38,6 @@ export const authService = {
   logout: () => {
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem('auth_expiry');
-    // Opsional: arahkan ke login setelah logout
-    // window.location.href = '/login'; 
   }
 };
 

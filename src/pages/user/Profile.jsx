@@ -3,7 +3,7 @@ import { authService } from '../../utils/auth';
 
 const Profile = () => {
   const [user, setUser] = useState(null);
-  const [form, setForm] = useState({ fullName: '', phone: '', address: '' });
+  const [form, setForm] = useState({ fullName: '', phone: '', address: '', username: '' });
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   
@@ -47,6 +47,7 @@ const Profile = () => {
       setUser(data);
       // Sinkronkan form dengan data dari backend
       setForm({ 
+        username: data.username || data.Username || '',
         fullName: data.fullName || data.FullName || '', 
         phone: data.phone || data.Phone || '', 
         address: data.address || data.Address || '' 
@@ -66,40 +67,65 @@ const Profile = () => {
     e.preventDefault();
     
     try {
+      // Pastikan ID diambil dengan benar
       const userId = user?.userId || user?.UserId;
       
+      // Susun data agar sesuai dengan model User di Backend
+      // Kita kirimkan semua data yang ada di state 'user' lalu timpa dengan data 'form'
       const updateData = {
-        // Tetap sertakan data lama yang tidak diubah agar tidak NULL di DB
-        username: user.username || user.Username,
-        email: user.email || user.Email,
-        fullName: form.fullName,
-        phone: form.phone,
-        address: form.address,
-        role: user.role ?? user.Role
+        userId: userId,
+        Username: form.username,
+        email: user.email || user.Email, // Email biasanya tidak diedit, jadi ambil dari state user oke
+        fullName: form.fullName, // Mengambil dari form (Sudah benar)
+        phone: form.phone,       // Mengambil dari form (Sudah benar)
+        address: form.address,   // Mengambil dari form (Sudah benar)
+        role: user.role ?? user.Role,
+        passwordHash: user.passwordHash || user.PasswordHash || null,
+        bookings: null,
+        membership: null
       };
+
+      console.log("Data yang dikirim ke backend:", updateData);
 
       const res = await fetch(`http://localhost:5014/api/Users/${userId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          // Jika backend kamu pakai JWT, jangan lupa sertakan tokennya
+          'Authorization': `Bearer ${JSON.parse(localStorage.getItem('auth_data'))?.token}`
+        },
         body: JSON.stringify(updateData),
       });
 
-      if (!res.ok) throw new Error('Failed to update profile');
+     if (res.ok) {
+        // 1. Ambil data mentah menggunakan key yang benar
+        const rawData = localStorage.getItem('user_data');
+        
+        if (rawData) {
+          let storedData = JSON.parse(rawData);
+          
+          // 2. Update field yang berubah (Sesuaikan dengan struktur flat kamu)
+          storedData.fullName = form.fullName;
+          storedData.FullName = form.fullName; // Case backup
+          storedData.username = form.username;
+          storedData.Username = form.username; // Case backup
+          
+          // 3. Simpan kembali dengan key 'user_data'
+          localStorage.setItem('user_data', JSON.stringify(storedData));
+          
+          // 4. Trigger event ke UserLayout
+          window.dispatchEvent(new Event("userUpdate"));
+          
+          console.log("Storage user_data berhasil diperbarui!");
+        }
 
-      // ✅ Update data di localStorage agar navbar/komponen lain ikut update
-      const updatedLocalStorageUser = {
-        ...currentUser,
-        fullName: form.fullName
-      };
-      // Gunakan method yang sesuai di authService Anda untuk update storage
-      localStorage.setItem('user', JSON.stringify(updatedLocalStorageUser));
-
-      alert('Profil berhasil diupdate!');
-      setEditing(false);
-      fetchUser(); // Refresh data
+        alert('Profil berhasil diupdate!');
+        setEditing(false);
+        fetchUser();
+      } 
     } catch (err) {
       console.error('Error updating profile:', err);
-      alert('Gagal mengupdate profil');
+      alert('Gagal mengupdate profil. Cek konsol untuk detailnya.');
     }
   };
 
@@ -129,6 +155,7 @@ const Profile = () => {
   const userEmail = user?.email || user?.Email || '';
   const userPhone = user?.phone || user?.Phone || '';
   const userAddress = user?.address || user?.Address || '';
+  const userUsername = user?.username || user?.Username || '';
   const userRole = user?.role ?? user?.Role;
 
   const getRoleText = (role) => {
@@ -176,6 +203,11 @@ const Profile = () => {
 
             <div className="p-8">
               {!editing ? (
+                <div className="space-y-4">
+                <div className="flex border-b pb-2">
+                  <span className="w-1/3 text-gray-400">Username</span>
+                  <span className="font-semibold text-gray-700">{userUsername}</span>
+                </div>
                 <div className="grid grid-cols-1 gap-y-6">
                   <div className="flex flex-col sm:flex-row sm:border-b sm:border-gray-50 pb-4">
                     <span className="text-sm font-medium text-gray-400 w-full sm:w-1/3">Nama Lengkap</span>
@@ -194,8 +226,18 @@ const Profile = () => {
                     <span className="text-gray-800 font-semibold">{userAddress || '-'}</span>
                   </div>
                 </div>
+              </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">
+
+                  <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500">Username</label>
+                  <input 
+                    type="text" name="username" value={form.username} onChange={handleChange}
+                    className="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
                   <div className="flex flex-col space-y-1.5">
                     <label className="text-sm font-bold text-gray-600">Nama Lengkap</label>
                     <input 

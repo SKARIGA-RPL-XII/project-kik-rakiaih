@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet, NavLink, useLocation } from "react-router-dom";
 import myLogo from "../assets/logo.png";
 import { authService } from "../utils/auth"; // ✅ Import authService
 
@@ -8,8 +8,39 @@ const UserLayout = ({ onLogout }) => {
   const [scrolled, setScrolled] = useState(false);
   
   // ✅ Get user dari localStorage
-  const user = authService.getUser();
+  const [user, setUser] = useState(authService.getUser());
+  const location = useLocation();
+  const syncUser = () => {
+    const updatedUser = authService.getUser();
+    setUser(updatedUser);
+  };
+  // ✅ 1. Efek khusus untuk mendengarkan perubahan data (Real-time)
+  useEffect(() => {
+    const syncUser = () => {
+      console.log("Menyinkronkan data user...");
+      const updatedUser = authService.getUser();
+      setUser(updatedUser);
+    };
 
+    // Dengarkan perubahan dari tab lain atau custom event dari Profile.jsx
+    window.addEventListener("storage", syncUser);
+    window.addEventListener("userUpdate", syncUser);
+
+    // Jalankan sekali saat mount
+    syncUser();
+
+    return () => {
+      window.removeEventListener("storage", syncUser);
+      window.removeEventListener("userUpdate", syncUser);
+    };
+  }, []); // Kosongkan dependency agar listener tetap hidup selama Layout ada
+
+  // ✅ 2. Efek saat pindah halaman (Route change)
+  useEffect(() => {
+    const updatedUser = authService.getUser();
+    setUser(updatedUser);
+    setMenuOpen(false); // Tutup menu mobile otomatis saat pindah halaman
+  }, [location.pathname]);
   // Efek untuk deteksi scroll agar navbar berubah saat di-scroll
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -26,17 +57,13 @@ const UserLayout = ({ onLogout }) => {
   ];
 
   // ✅ Get user data dengan fallback
-  const userFullName = user?.fullName || user?.FullName || 'User';
+ const userFullName = user?.fullName || user?.FullName || 'User';
   const userEmail = user?.email || user?.Email || '';
   const userInitial = userFullName.charAt(0).toUpperCase();
 
-  // ✅ Get role text
   const getRoleText = (role) => {
-    const roles = {
-      0: 'Customer',
-      1: 'Admin'
-    };
-    return typeof role === 'number' ? roles[role] : role;
+    const roles = { 0: 'Customer', 1: 'Admin' };
+    return roles[role] || 'User';
   };
 
   return (

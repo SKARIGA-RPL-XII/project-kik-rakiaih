@@ -26,8 +26,32 @@ const Booking = () => {
   const user = authService.getUser();
 
   useEffect(() => {
-    fetchFields();
+    fetchAvailableFields();
   }, []);
+
+  const fetchAvailableFields = async () => {
+    setLoading(true);
+    try {
+      const now = new Date();
+      const dateStr = getLocalToday();
+      
+      // Ambil jam sekarang dan jam berikutnya untuk filter awal
+      const currentHour = now.getHours();
+      const startTime = currentHour.toString().padStart(2, "0") + ":00";
+      const endTime = (currentHour + 1).toString().padStart(2, "0") + ":00";
+
+      // Panggil API Available (Logika yang sama dengan Dashboard)
+      const url = `http://localhost:5014/api/Fields/available?date=${dateStr}&startTime=${startTime}&endTime=${endTime}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      setFields(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("❌ Gagal mengambil lapangan tersedia:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchFields = async () => {
     try {
@@ -77,17 +101,46 @@ const Booking = () => {
   };
 
   const handleBook = async (field) => {
-    const authData = JSON.parse(localStorage.getItem('auth_data'));
-    const token = authData?.token;
+  const authData = JSON.parse(localStorage.getItem('auth_data'));
+  const token = authData?.token;
 
-    if (!user) {
-      alert("Silakan login terlebih dahulu!");
-      navigate("/login");
+  // 1. Validasi Awal
+  if (!user) {
+    alert("Silakan login terlebih dahulu!");
+    navigate("/login");
+    return;
+  }
+
+  if (!form.startTime || !form.endTime) {
+    alert("Tentukan jam mulai dan selesai terlebih dahulu!");
+    return;
+  }
+
+  const start = parseInt(form.startTime.split(":")[0]);
+  const end = parseInt(form.endTime.split(":")[0]);
+  if (end <= start) {
+    alert("Waktu selesai harus lebih besar dari waktu mulai!");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    // ✅ 2. CEK KETERSEDIAAN OTOMATIS
+    const checkUrl = `http://localhost:5014/api/Fields/available?date=${form.bookingDate}&startTime=${form.startTime}&endTime=${form.endTime}`;
+    const checkRes = await fetch(checkUrl);
+    const availableFields = await checkRes.json();
+
+    // Apakah lapangan ini masih ada di daftar tersedia?
+    const isAvailable = availableFields.some(af => (af.fieldId || af.FieldId) === field.fieldId);
+
+    if (!isAvailable) {
+      alert("Maaf, lapangan ini sudah penuh di jam tersebut.");
+      setLoading(false); // Jangan lupa matikan loading
       return;
     }
 
-    const start = parseInt(form.startTime.split(":")[0]);
-    const end = parseInt(form.endTime.split(":")[0]);
+    // ✅ 3. JALANKAN PROSES BOOKING (Jika tersedia)
     const durationHours = end - start;
     const totalPrice = durationHours * field.pricePerHour;
 
@@ -105,30 +158,34 @@ const Booking = () => {
       notes: form.notes || "",
     };
 
-    setLoading(true);
-    try {
-      const res = await fetch("http://localhost:5014/api/Bookings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
+    const res = await fetch("http://localhost:5014/api/Bookings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
 
-      if (res.ok) {
-        alert("Booking Berhasil! Alihkan ke pembayaran...");
-        navigate("/user/my-bookings");
-      } else {
-        const errorText = await res.text();
-        alert("Gagal: " + errorText);
-      }
-    } catch (err) {
-      alert("Terjadi kesalahan jaringan.");
-    } finally {
-      setLoading(false);
+    if (res.ok) {
+      alert("Booking Berhasil! Alihkan ke pembayaran...");
+      navigate("/user/my-bookings");
+    } else {
+      const errorText = await res.text();
+      alert("Gagal: " + errorText);
     }
-  };
+
+  } catch (err) {
+    // ✅ Catch ini akan menangkap error dari cek ketersediaan MAUPUN proses booking
+    console.error("Error:", err);
+    alert("Terjadi kesalahan jaringan atau server.");
+  } finally {
+    // ✅ Finally ini akan memastikan loading mati apa pun yang terjadi
+    setLoading(false);
+  }
+
+  
+};
 
   // Logika Filter: Tampilkan semua jika belum cek, tampilkan yang tersedia jika sudah cek
   const displayedFields = hasChecked 
@@ -178,7 +235,7 @@ const Booking = () => {
                 disabled={loading || !form.startTime || !form.endTime}
                 className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50"
               >
-                {loading ? "Mengecek..." : "Cek Ketersediaan"}
+                {loading ? "Mengecek..." : "Atur Waktu"}
               </button>
             </div>
           </div>
